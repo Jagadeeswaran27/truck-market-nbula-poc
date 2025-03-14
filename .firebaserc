@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "truck-market-cd295"
+  },
+  "targets": {
+    "truck-market-cd295": {
+      "hosting": {
+        "truck-market": [
+          "truck-market"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
