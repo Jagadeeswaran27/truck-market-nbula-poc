@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+ 
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 1rem;
+  }
+}
+ 
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+.glass-effect {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.card-hover {
+  @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
+}
+
+.button-primary {
+  @apply bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 inline-flex items-center justify-center rounded-full px-6 py-2.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none hover:shadow-md active:scale-95;
+}
+
+.button-secondary {
+  @apply bg-white text-gray-700 border shadow-sm hover:bg-gray-50 inline-flex items-center justify-center rounded-full px-6 py-2.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none hover:shadow-md active:scale-95;
+}
+
+.input-field {
+  @apply flex h-11 w-full rounded-full border border-input bg-white px-4 py-2 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 hover:border-gray-300;
+}
+
+.card {
+  @apply rounded-2xl border bg-card text-card-foreground shadow-sm transition-all hover:shadow-md;
+}
+
+.nav-item {
+  @apply flex flex-col items-center space-y-1 rounded-xl p-2.5 text-foreground/60 transition-all hover:bg-accent hover:text-accent-foreground;
+}
+
+.nav-item-active {
+  @apply text-primary bg-primary/10 font-medium;
+}
+
+.header {
+  @apply sticky top-0 z-50 glass-effect border-b px-4 py-3 flex items-center justify-between gap-4;
+}
+
+.product-grid {
+  @apply grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4;
+}
+
+.product-card {
+  @apply card overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1;
+}
+
+.product-image {
+  @apply aspect-square w-full object-cover;
+}
+
+.product-info {
+  @apply p-4 space-y-2;
+}
+
+.badge {
+  @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors;
+}
+
+.badge-primary {
+  @apply bg-primary/10 text-primary;
+}
+
+.badge-secondary {
+  @apply bg-secondary text-secondary-foreground;
+}
+
+.animate-in {
+  @apply transition-all duration-300 opacity-0 translate-y-2;
+}
+
+.animate-in[data-state="open"] {
+  @apply opacity-100 translate-y-0;
+}
+
+.section {
+  @apply p-4 space-y-4;
+}
+
+.heading-1 {
+  @apply text-2xl font-semibold tracking-tight;
+}
+
+.heading-2 {
+  @apply text-xl font-semibold tracking-tight;
+}
+
+.heading-3 {
+  @apply text-lg font-medium;
+}
+
+.text-balance {
+  text-wrap: balance;
+}
