@@ -1,26 +1,20 @@
-import { CapacitorConfig } from '@capacitor/cli';
+import { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: 'com.truckmarket.app',
-  appName: 'TruckMarket',
-  webDir: 'dist',
+  appId: "com.truckmarket.app",
+  appName: "TruckMarket",
+  webDir: "dist",
   server: {
-    androidScheme: 'https'
+    androidScheme: "https",
   },
   plugins: {
     Geolocation: {
-      permissions: {
-        ios: {
-          whenInUse: true,
-          always: false
-        },
-        android: {
-          coarseLocation: true,
-          fineLocation: true
-        }
-      }
-    }
-  }
+      androidBackgroundPermission: true,
+    },
+  },
+  android: {
+    allowMixedContent: true,
+  },
 };
 
 export default config;
