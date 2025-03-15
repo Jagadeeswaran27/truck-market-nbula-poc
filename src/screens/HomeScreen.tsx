@@ -143,7 +143,7 @@ function HomeScreen() {
               <div
                 key={product.id}
                 onClick={() => navigate(`/product/${product.id}`)}
-                className="product-card"
+                className="product-card group"
               >
                 <div className="relative">
                   <img
@@ -151,10 +151,12 @@ function HomeScreen() {
                     alt={product.title}
                     className="product-image"
                   />
-                  <div className="absolute bottom-2 right-2">
-                    <span className="badge badge-primary">
-                      ${product.price.toFixed(2)}
-                    </span>
+                  <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
+                    <div className="flex items-center justify-end">
+                      <span className="text-lg font-bold text-white drop-shadow-lg">
+                        ${product.price.toFixed(2)}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <div className="product-info">
