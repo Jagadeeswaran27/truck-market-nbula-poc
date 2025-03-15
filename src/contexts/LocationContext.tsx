@@ -26,27 +26,41 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function fetchLocation() {
+    let isMounted = true;
+
+    async function requestAndFetchLocation() {
       try {
-        // Request permissions first
+        // First, request permissions explicitly
         const permissionStatus = await Geolocation.checkPermissions();
-        if (permissionStatus.location !== 'granted') {
+        
+        if (permissionStatus.location === 'prompt' || permissionStatus.location === 'prompt-with-rationale') {
+          // Show a toast to inform the user about the upcoming permission request
+          toast.loading('Requesting location access...', { duration: 2000 });
+          
           const permission = await Geolocation.requestPermissions();
+          if (!isMounted) return;
+
           if (permission.location !== 'granted') {
             throw new Error('Location permission denied');
           }
+        } else if (permissionStatus.location !== 'granted') {
+          throw new Error('Location permission denied');
         }
 
-        // Get current position
+        // Get current position with high accuracy
         const position = await Geolocation.getCurrentPosition({
           enableHighAccuracy: true,
-          timeout: 5000,
+          timeout: 10000, // Increased timeout for better reliability
         });
+
+        if (!isMounted) return;
 
         // Reverse geocode using Google Maps API
         const response = await fetch(
           `https://maps.googleapis.com/maps/api/geocode/json?latlng=${position.coords.latitude},${position.coords.longitude}&key=AIzaSyDPlj-KWC4RVsBk-wGSDJHZ4ndv7Kfs15o`
         );
+
+        if (!isMounted) return;
 
         const data = await response.json();
         
@@ -56,17 +70,38 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude
           });
+          toast.success('Location access granted');
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error getting location:', err);
-        setError('Failed to get your location');
-        toast.error('Failed to get your location. Please set it manually.');
+        
+        if (!isMounted) return;
+
+        // Provide more specific error messages
+        if (err.message.includes('permission denied')) {
+          setError('Location access denied. Please enable location services to use all features.');
+          toast.error('Location access denied. Some features may be limited.');
+        } else if (err.code === 3 || err.message.includes('timeout')) {
+          setError('Location request timed out. Please try again.');
+          toast.error('Could not get your location. Please try again.');
+        } else {
+          setError('Failed to get your location');
+          toast.error('Failed to get your location. Please set it manually.');
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
 
-    fetchLocation();
+    // Start the location request process immediately
+    requestAndFetchLocation();
+
+    // Cleanup function
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return (
