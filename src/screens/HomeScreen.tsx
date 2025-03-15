@@ -5,7 +5,7 @@ import { Search, MapPin, Bell, Filter } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from '../contexts/LocationContext';
-import { Product } from '../types';
+import { Product, Location } from '../types';
 import { cn } from '../lib/utils';
 import LocationSearchModal from '../components/LocationSearchModal';
 
@@ -24,7 +24,7 @@ function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const { currentUser } = useAuth();
-  const { currentLocation, loading: locationLoading } = useLocation();
+  const { currentLocation, setCurrentLocation, loading: locationLoading } = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -66,6 +66,11 @@ function HomeScreen() {
 
     fetchProducts();
   }, [currentUser, selectedCategory, searchQuery]);
+
+  const handleLocationSelect = (location: Location) => {
+    setCurrentLocation(location);
+    setIsLocationModalOpen(false);
+  };
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -176,10 +181,11 @@ function HomeScreen() {
         )}
       </div>
 
-      {/* Add the LocationSearchModal */}
+      {/* Location Search Modal */}
       <LocationSearchModal
         isOpen={isLocationModalOpen}
         onClose={() => setIsLocationModalOpen(false)}
+        onLocationSelect={handleLocationSelect}
       />
     </div>
   );
