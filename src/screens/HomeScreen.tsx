@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
-import { Search, MapPin, Bell, Filter } from 'lucide-react';
+import { Search, MapPin, Bell, Filter, ChevronDown } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from '../contexts/LocationContext';
@@ -17,12 +17,33 @@ const categories = [
   { id: 'home', name: 'Home & Garden', icon: '🏠' },
 ];
 
+const distanceOptions = [
+  { value: 'everywhere', label: 'Everywhere' },
+  { value: '5', label: '< 5km' },
+  { value: '10', label: '< 10km' },
+  { value: '50', label: '< 50km' },
+];
+
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth's radius in kilometers
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
 function HomeScreen() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedDistance, setSelectedDistance] = useState('everywhere');
   const [searchQuery, setSearchQuery] = useState('');
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const { currentUser } = useAuth();
   const { currentLocation, setCurrentLocation, loading: locationLoading } = useLocation();
   const navigate = useNavigate();
@@ -40,23 +61,44 @@ function HomeScreen() {
         );
 
         const querySnapshot = await getDocs(q);
-        const fetchedProducts = querySnapshot.docs.map(doc => ({
+        let fetchedProducts = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         })) as Product[];
 
-        const filteredProducts = selectedCategory === 'all'
-          ? fetchedProducts
-          : fetchedProducts.filter(product => product.category === selectedCategory);
+        // Filter by category
+        if (selectedCategory !== 'all') {
+          fetchedProducts = fetchedProducts.filter(product => 
+            product.category === selectedCategory
+          );
+        }
 
-        const searchedProducts = searchQuery
-          ? filteredProducts.filter(product =>
-              product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              product.description.toLowerCase().includes(searchQuery.toLowerCase())
-            )
-          : filteredProducts;
+        // Filter by distance if location is available and distance is selected
+        if (currentLocation && selectedDistance !== 'everywhere') {
+          const maxDistance = parseInt(selectedDistance);
+          fetchedProducts = fetchedProducts.filter(product => {
+            const dropLocation = product.dropLocations[0];
+            if (!dropLocation) return false;
+            
+            const distance = calculateDistance(
+              currentLocation.latitude,
+              currentLocation.longitude,
+              dropLocation.latitude,
+              dropLocation.longitude
+            );
+            return distance <= maxDistance;
+          });
+        }
 
-        setProducts(searchedProducts);
+        // Filter by search query
+        if (searchQuery) {
+          fetchedProducts = fetchedProducts.filter(product =>
+            product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            product.description.toLowerCase().includes(searchQuery.toLowerCase())
+          );
+        }
+
+        setProducts(fetchedProducts);
       } catch (error) {
         console.error('Error fetching products:', error);
       } finally {
@@ -65,7 +107,7 @@ function HomeScreen() {
     }
 
     fetchProducts();
-  }, [currentUser, selectedCategory, searchQuery]);
+  }, [currentUser, selectedCategory, selectedDistance, searchQuery, currentLocation]);
 
   const handleLocationSelect = (location: Location) => {
     setCurrentLocation(location);
@@ -95,7 +137,7 @@ function HomeScreen() {
       </header>
 
       <div className="section">
-        {/* Search */}
+        {/* Search and Filter */}
         <div className="flex gap-2">
           <div className="relative flex-1">
             <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -109,9 +151,41 @@ function HomeScreen() {
               className="w-full h-11 pl-10 pr-4 rounded-full border border-input bg-white text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 hover:border-gray-300"
             />
           </div>
-          <button className="button-secondary !px-3">
-            <Filter className="h-4 w-4" />
-          </button>
+          <div className="relative">
+            <button 
+              onClick={() => setIsFilterOpen(!isFilterOpen)}
+              className="button-secondary !px-3 flex items-center gap-1"
+            >
+              <Filter className="h-4 w-4" />
+              <ChevronDown className="h-4 w-4" />
+            </button>
+            {isFilterOpen && (
+              <div className="absolute right-0 mt-2 w-48 rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5 z-50">
+                <div className="p-2">
+                  <div className="px-3 py-2 text-sm font-medium text-gray-500">
+                    Distance
+                  </div>
+                  {distanceOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => {
+                        setSelectedDistance(option.value);
+                        setIsFilterOpen(false);
+                      }}
+                      className={cn(
+                        "w-full text-left px-3 py-2 text-sm rounded-md",
+                        selectedDistance === option.value
+                          ? "bg-primary text-white"
+                          : "text-gray-700 hover:bg-gray-100"
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Categories */}
