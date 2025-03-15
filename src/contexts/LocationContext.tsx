@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { Geolocation } from '@capacitor/geolocation';
 import { Location } from '../types';
 import toast from 'react-hot-toast';
 
@@ -27,14 +28,22 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     async function fetchLocation() {
       try {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 5000,
-            maximumAge: 0
-          });
+        // Request permissions first
+        const permissionStatus = await Geolocation.checkPermissions();
+        if (permissionStatus.location !== 'granted') {
+          const permission = await Geolocation.requestPermissions();
+          if (permission.location !== 'granted') {
+            throw new Error('Location permission denied');
+          }
+        }
+
+        // Get current position
+        const position = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 5000,
         });
 
+        // Reverse geocode using Google Maps API
         const response = await fetch(
           `https://maps.googleapis.com/maps/api/geocode/json?latlng=${position.coords.latitude},${position.coords.longitude}&key=AIzaSyDPlj-KWC4RVsBk-wGSDJHZ4ndv7Kfs15o`
         );
