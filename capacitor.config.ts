@@ -9,7 +9,16 @@ const config: CapacitorConfig = {
   },
   plugins: {
     Geolocation: {
-      permissions: ['location']
+      permissions: {
+        ios: {
+          whenInUse: true,
+          always: false
+        },
+        android: {
+          coarseLocation: true,
+          fineLocation: true
+        }
+      }
     }
   }
 };
