@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, X, MapPin, Loader2 } from 'lucide-react';
+import { Search, X, MapPin, Loader2, ListOrdered } from 'lucide-react';
 import { Location } from '../types';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import toast from 'react-hot-toast';
+import { cn } from '../lib/utils';
 
 interface LocationSearchModalProps {
   isOpen: boolean;
@@ -15,10 +18,14 @@ declare global {
   }
 }
 
+type LocationSource = 'google' | 'predefined';
+
 export default function LocationSearchModal({ isOpen, onClose, onLocationSelect }: LocationSearchModalProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<google.maps.places.AutocompleteSuggestion[]>([]);
+  const [predefinedLocations, setPredefinedLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(false);
+  const [activeSource, setActiveSource] = useState<LocationSource>('google');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const requestRef = useRef<{
     input: string;
@@ -32,22 +39,41 @@ export default function LocationSearchModal({ isOpen, onClose, onLocationSelect 
   });
   const newestRequestIdRef = useRef(0);
 
-  // Initialize session token when modal opens
+  // Initialize session token and fetch predefined locations when modal opens
   useEffect(() => {
     if (isOpen) {
       refreshToken();
+      fetchPredefinedLocations();
       if (searchInputRef.current) {
         searchInputRef.current.focus();
       }
     }
   }, [isOpen]);
 
+  const fetchPredefinedLocations = async () => {
+    try {
+      setLoading(true);
+      const locationsRef = collection(db, 'predefinedLocations');
+      const snapshot = await getDocs(locationsRef);
+      const locations = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Location[];
+      setPredefinedLocations(locations);
+    } catch (error) {
+      console.error('Error fetching predefined locations:', error);
+      toast.error('Failed to load predefined locations');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const refreshToken = () => {
     requestRef.current.sessionToken = new google.maps.places.AutocompleteSessionToken();
   };
 
   const makeAutocompleteRequest = async (value: string) => {
-    if (!value.trim()) {
+    if (!value.trim() || activeSource === 'predefined') {
       setSuggestions([]);
       return;
     }
@@ -59,17 +85,14 @@ export default function LocationSearchModal({ isOpen, onClose, onLocationSelect 
     try {
       const { suggestions } = await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
         ...requestRef.current,
-        // Add locationBias for India
         locationBias: {
-          // Rough bounding box for India
-          north: 35.5,  // Northern-most latitude
-          south: 6.5,   // Southern-most latitude
-          east: 97.5,   // Eastern-most longitude
-          west: 68.0    // Western-most longitude
+          north: 35.5,
+          south: 6.5,
+          east: 97.5,
+          west: 68.0
         }
       });
 
-      // If this request has been superseded by a newer one, don't update the state
       if (requestId !== newestRequestIdRef.current) return;
 
       setSuggestions(suggestions);
@@ -90,7 +113,6 @@ export default function LocationSearchModal({ isOpen, onClose, onLocationSelect 
         fields: ['displayName', 'formattedAddress', 'location'],
       });
 
-      // Get the location coordinates
       const lat = place.location?.lat();
       const lng = place.location?.lng();
 
@@ -98,7 +120,6 @@ export default function LocationSearchModal({ isOpen, onClose, onLocationSelect 
         throw new Error('Invalid location coordinates');
       }
 
-      // Construct the full address from the suggestion text and secondary text
       const mainText = suggestion.placePrediction.text.toString();
       const secondaryText = suggestion.placePrediction.secondaryText?.toString() || '';
       const fullAddress = secondaryText ? `${mainText}, ${secondaryText}` : mainText;
@@ -110,8 +131,8 @@ export default function LocationSearchModal({ isOpen, onClose, onLocationSelect 
       };
 
       onLocationSelect(location);
-      setSearchQuery(''); // Clear the search input
-      refreshToken(); // Get a new token for the next search
+      setSearchQuery('');
+      refreshToken();
       onClose();
     } catch (error) {
       console.error('Error getting location details:', error);
@@ -121,13 +142,27 @@ export default function LocationSearchModal({ isOpen, onClose, onLocationSelect 
     }
   };
 
+  const handlePredefinedLocationSelect = (location: Location) => {
+    onLocationSelect(location);
+    setSearchQuery('');
+    onClose();
+  };
+
+  const filteredPredefinedLocations = searchQuery
+    ? predefinedLocations.filter(location =>
+        location.address.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : predefinedLocations;
+
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      makeAutocompleteRequest(searchQuery);
+      if (activeSource === 'google') {
+        makeAutocompleteRequest(searchQuery);
+      }
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [searchQuery]);
+  }, [searchQuery, activeSource]);
 
   if (!isOpen) return null;
 
@@ -145,7 +180,7 @@ export default function LocationSearchModal({ isOpen, onClose, onLocationSelect 
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search for area, street name..."
+                placeholder={activeSource === 'google' ? "Search for area, street name..." : "Search predefined locations..."}
                 className="w-full h-11 pl-10 pr-4 rounded-full border border-input bg-white text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 hover:border-gray-300"
               />
             </div>
@@ -156,6 +191,30 @@ export default function LocationSearchModal({ isOpen, onClose, onLocationSelect 
               <X className="h-5 w-5" />
             </button>
           </div>
+          <div className="flex px-4 pb-4 gap-2">
+            <button
+              onClick={() => setActiveSource('google')}
+              className={cn(
+                "flex-1 py-2 px-4 rounded-full text-sm font-medium transition-colors",
+                activeSource === 'google'
+                  ? "bg-primary text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              )}
+            >
+              Google Places
+            </button>
+            <button
+              onClick={() => setActiveSource('predefined')}
+              className={cn(
+                "flex-1 py-2 px-4 rounded-full text-sm font-medium transition-colors",
+                activeSource === 'predefined'
+                  ? "bg-primary text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              )}
+            >
+              Predefined
+            </button>
+          </div>
         </div>
 
         <div className="p-4 space-y-4">
@@ -163,33 +222,59 @@ export default function LocationSearchModal({ isOpen, onClose, onLocationSelect 
             <div className="flex justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
-          ) : suggestions.length > 0 ? (
-            <div className="space-y-2">
-              {suggestions.map((suggestion) => (
-                <button
-                  key={suggestion.placePrediction.placeId}
-                  onClick={() => handleLocationSelect(suggestion)}
-                  className="w-full flex items-start gap-3 rounded-lg p-2 text-left transition-colors hover:bg-accent"
-                >
-                  <MapPin className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
-                  <div>
-                    <p className="font-medium">
-                      {suggestion.placePrediction.text.toString()}
-                    </p>
-                    {suggestion.placePrediction.secondaryText && (
-                      <p className="text-sm text-muted-foreground">
-                        {suggestion.placePrediction.secondaryText.toString()}
+          ) : activeSource === 'google' ? (
+            suggestions.length > 0 ? (
+              <div className="space-y-2">
+                {suggestions.map((suggestion) => (
+                  <button
+                    key={suggestion.placePrediction.placeId}
+                    onClick={() => handleLocationSelect(suggestion)}
+                    className="w-full flex items-start gap-3 rounded-lg p-2 text-left transition-colors hover:bg-accent"
+                  >
+                    <MapPin className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">
+                        {suggestion.placePrediction.text.toString()}
                       </p>
-                    )}
-                  </div>
-                </button>
-              ))}
+                      {suggestion.placePrediction.secondaryText && (
+                        <p className="text-sm text-muted-foreground">
+                          {suggestion.placePrediction.secondaryText.toString()}
+                        </p>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : searchQuery ? (
+              <p className="text-center text-muted-foreground py-8">
+                No results found
+              </p>
+            ) : null
+          ) : (
+            <div className="space-y-2">
+              {filteredPredefinedLocations.length > 0 ? (
+                filteredPredefinedLocations.map((location) => (
+                  <button
+                    key={location.address}
+                    onClick={() => handlePredefinedLocationSelect(location)}
+                    className="w-full flex items-start gap-3 rounded-lg p-2 text-left transition-colors hover:bg-accent"
+                  >
+                    <ListOrdered className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">{location.address}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Predefined Location
+                      </p>
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <p className="text-center text-muted-foreground py-8">
+                  No predefined locations found
+                </p>
+              )}
             </div>
-          ) : searchQuery ? (
-            <p className="text-center text-muted-foreground py-8">
-              No results found
-            </p>
-          ) : null}
+          )}
         </div>
       </div>
     </div>
