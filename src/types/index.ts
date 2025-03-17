@@ -20,7 +20,7 @@ export interface Product {
   title: string;
   description: string;
   price: number;
-  condition: 'New' | 'Like New' | 'Good' | 'Fair';
+  sellingReason: 'Packaging damaged' | 'Product damaged' | 'Over stock' | 'Others';
   category: string;
   images: string[];
   dropLocations: Location[];

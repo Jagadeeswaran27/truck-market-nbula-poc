@@ -16,7 +16,9 @@ const productSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters'),
   description: z.string().min(10, 'Description must be at least 10 characters'),
   price: z.string().transform((val) => parseFloat(val)),
-  condition: z.enum(['New', 'Like New', 'Good', 'Fair']),
+  sellingReason: z.enum(['Packaging damaged', 'Product damaged', 'Over stock', 'Others'], {
+    required_error: 'Please select a selling reason',
+  }),
   category: z.string().min(1, 'Please select a category'),
 });
 
@@ -26,7 +28,7 @@ const categories = [
   { id: 'electronics', name: 'Electronics', icon: '📱' },
   { id: 'food', name: 'Food', icon: '🍔' },
   { id: 'clothing', name: 'Clothing', icon: '👕' },
-  { id: 'home', name: 'Home & Garden', icon: '🏠' },
+  { id: 'home', name: 'Others', icon: '🏠' },
 ];
 
 function AddPostScreen() {
@@ -41,7 +43,7 @@ function AddPostScreen() {
   const { register, handleSubmit, watch, formState: { errors } } = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
     defaultValues: {
-      condition: undefined,
+      sellingReason: undefined,
       category: '',
     }
   });
@@ -111,23 +113,11 @@ function AddPostScreen() {
     try {
       setLoading(true);
       const imageUrls = await uploadImages();
-      console.log({
-        title: data.title,
-        description: data.description,
-        price: data.price,
-        condition: data.condition,
-        category: data.category,
-        images: imageUrls,
-        dropLocations: dropLocations,
-        status: 'active',
-        createdBy: currentUser.uid,
-        createdAt: serverTimestamp()
-      });
       await addDoc(collection(db, 'products'), {
         title: data.title,
         description: data.description,
         price: data.price,
-        condition: data.condition,
+        sellingReason: data.sellingReason,
         category: data.category,
         images: imageUrls,
         dropLocations: dropLocations,
@@ -265,21 +255,21 @@ function AddPostScreen() {
             <h2 className="text-lg font-medium text-gray-900">Product Details</h2>
 
             <div>
-              <label htmlFor="condition" className="block text-sm font-medium text-gray-700">
-                Condition
+              <label htmlFor="sellingReason" className="block text-sm font-medium text-gray-700">
+                Selling Reason
               </label>
               <select
-                {...register('condition')}
+                {...register('sellingReason')}
                 className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
               >
-                <option value="">Select condition</option>
-                <option value="New">New</option>
-                <option value="Like New">Like New</option>
-                <option value="Good">Good</option>
-                <option value="Fair">Fair</option>
+                <option value="">Select selling reason</option>
+                <option value="Packaging damaged">Packaging damaged</option>
+                <option value="Product damaged">Product damaged</option>
+                <option value="Over stock">Over stock</option>
+                <option value="Others">Others</option>
               </select>
-              {errors.condition && (
-                <p className="mt-1 text-sm text-red-600">{errors.condition.message}</p>
+              {errors.sellingReason && (
+                <p className="mt-1 text-sm text-red-600">{errors.sellingReason.message}</p>
               )}
             </div>
 

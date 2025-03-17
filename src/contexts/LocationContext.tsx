@@ -22,17 +22,14 @@ export function useLocation() {
 }
 
 export function LocationProvider({ children }: { children: React.ReactNode }) {
-  const [currentLocation, _setCurrentLocation] = useState<Location | null>(
-    null
-  );
-  const [loading, setLoading] = useState(true);
+  const [currentLocation, _setCurrentLocation] = useState<Location | null>(null);
+  const [loading, setLoading] = useState(false); // Start with false to not block initial render
   const [error, setError] = useState<string | null>(null);
-  // Remove permissionRequested state as it resets on app restart
 
   // Wrapper for setCurrentLocation that also handles loading state
   const setCurrentLocation = (location: Location) => {
-    setLoading(false); // Clear loading state when location is manually set
-    setError(null); // Clear any previous errors
+    setLoading(false);
+    setError(null);
     _setCurrentLocation(location);
   };
 
@@ -41,7 +38,6 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       setLoading(true);
       setError(null);
 
-      // Always request permission - this will show the dialog if it hasn't been shown before
       const permission = await Geolocation.requestPermissions();
 
       if (permission.location === "granted") {
@@ -59,57 +55,74 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
 
   const getCurrentPosition = async () => {
     try {
-      setLoading(true); // Set loading state when getting position
+      setLoading(true);
+      
       const position = await Geolocation.getCurrentPosition({
         enableHighAccuracy: true,
-        timeout: 10000,
+        timeout: 30000,
+        maximumAge: 0
       });
 
-      // Reverse geocode using Google Maps API
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${position.coords.latitude},${position.coords.longitude}&key=AIzaSyDPlj-KWC4RVsBk-wGSDJHZ4ndv7Kfs15o`
-      );
+      // Add retry logic for reverse geocoding
+      const maxRetries = 3;
+      let attempt = 0;
+      let success = false;
 
-      const data = await response.json();
+      while (attempt < maxRetries && !success) {
+        try {
+          const response = await fetch(
+            `https://maps.googleapis.com/maps/api/geocode/json?latlng=${position.coords.latitude},${position.coords.longitude}&key=AIzaSyDPlj-KWC4RVsBk-wGSDJHZ4ndv7Kfs15o`
+          );
 
-      if (data.results[0]) {
-        _setCurrentLocation({
-          address: data.results[0].formatted_address,
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
-        setLoading(false); // Clear loading state after successful location update
-        toast.success("Location updated successfully");
-      } else {
-        throw new Error("No address found for this location");
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const data = await response.json();
+
+          if (data.results[0]) {
+            _setCurrentLocation({
+              address: data.results[0].formatted_address,
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            });
+            success = true;
+          } else {
+            throw new Error("No address found for this location");
+          }
+        } catch (err) {
+          attempt++;
+          if (attempt === maxRetries) {
+            throw err;
+          }
+          await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+        }
       }
     } catch (err: any) {
       console.error("Error getting current position:", err);
+      let errorMessage = "Failed to get your location. Please try again.";
+
       if (err.code === 1) {
-        setError("Location permission denied");
-        toast.error("Location access denied. Some features may be limited.");
+        errorMessage = "Location access denied. Some features may be limited.";
       } else if (err.code === 2) {
-        setError("Location is not available");
-        toast.error(
-          "Location is not available. Please check your device settings."
-        );
+        errorMessage = "Location is not available. Please check your device settings.";
       } else if (err.code === 3) {
-        setError("Location request timed out");
-        toast.error("Location request timed out. Please try again.");
-      } else {
-        setError("Failed to get location");
-        toast.error("Failed to get your location. Please try again.");
+        errorMessage = "Location request timed out. Please try again.";
       }
-      setLoading(false); // Make sure to set loading to false on error
+
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     let mounted = true;
+    let timeoutId: NodeJS.Timeout;
 
     async function initializeLocation() {
       try {
-        // First check if permission is already granted
         const permissionStatus = await Geolocation.checkPermissions();
 
         if (permissionStatus.location === "granted") {
@@ -118,7 +131,8 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
           }
         } else {
           if (mounted) {
-            await requestLocationPermission();
+            // Don't automatically request permission, wait for user interaction
+            setLoading(false);
           }
         }
       } catch (err) {
@@ -130,15 +144,15 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // Small delay to ensure UI is rendered before showing permission dialog
-    setTimeout(() => {
+    timeoutId = setTimeout(() => {
       initializeLocation();
-    }, 500);
+    }, 1000);
 
     return () => {
       mounted = false;
+      clearTimeout(timeoutId);
     };
-  }, []); // Remove permissionRequested dependency
+  }, []);
 
   const value = {
     currentLocation,

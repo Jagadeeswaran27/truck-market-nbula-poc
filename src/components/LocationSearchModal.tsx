@@ -62,7 +62,7 @@ export default function LocationSearchModal({ isOpen, onClose, onLocationSelect 
       setPredefinedLocations(locations);
     } catch (error) {
       console.error('Error fetching predefined locations:', error);
-      toast.error('Failed to load predefined locations');
+      toast.error('Failed to load donation centers');
     } finally {
       setLoading(false);
     }
@@ -180,7 +180,7 @@ export default function LocationSearchModal({ isOpen, onClose, onLocationSelect 
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={activeSource === 'google' ? "Search for area, street name..." : "Search predefined locations..."}
+                placeholder={activeSource === 'google' ? "Search for area, street name..." : "Search donation centers..."}
                 className="w-full h-11 pl-10 pr-4 rounded-full border border-input bg-white text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 hover:border-gray-300"
               />
             </div>
@@ -212,7 +212,7 @@ export default function LocationSearchModal({ isOpen, onClose, onLocationSelect 
                   : "bg-gray-100 text-gray-600 hover:bg-gray-200"
               )}
             >
-              Predefined
+              Donation Centers
             </button>
           </div>
         </div>
@@ -263,14 +263,14 @@ export default function LocationSearchModal({ isOpen, onClose, onLocationSelect 
                     <div>
                       <p className="font-medium">{location.address}</p>
                       <p className="text-sm text-muted-foreground">
-                        Predefined Location
+                        Donation Center
                       </p>
                     </div>
                   </button>
                 ))
               ) : (
                 <p className="text-center text-muted-foreground py-8">
-                  No predefined locations found
+                  No donation centers found
                 </p>
               )}
             </div>

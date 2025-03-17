@@ -14,14 +14,14 @@ const categories = [
   { id: 'electronics', name: 'Electronics', icon: '📱' },
   { id: 'food', name: 'Food', icon: '🍔' },
   { id: 'clothing', name: 'Clothing', icon: '👕' },
-  { id: 'home', name: 'Home & Garden', icon: '🏠' },
+  { id: 'home', name: 'Others', icon: '🏠' },
 ];
 
 const distanceOptions = [
-  { value: 'everywhere', label: 'Everywhere' },
   { value: '5', label: '< 5km' },
   { value: '10', label: '< 10km' },
   { value: '50', label: '< 50km' },
+  { value: 'everywhere', label: 'Everywhere' },
 ];
 
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -37,8 +37,9 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 }
 
 function HomeScreen() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedDistance, setSelectedDistance] = useState('everywhere');
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,66 +49,86 @@ function HomeScreen() {
   const { currentLocation, setCurrentLocation, loading: locationLoading } = useLocation();
   const navigate = useNavigate();
 
+  // Fetch products
   useEffect(() => {
     async function fetchProducts() {
       try {
+        setLoading(true);
         const productsRef = collection(db, 'products');
         let q = query(
           productsRef,
           where('status', '==', 'active'),
-          where('createdBy', '!=', currentUser?.uid),
-          orderBy('createdBy'),
           orderBy('createdAt', 'desc')
         );
 
+        if (currentUser) {
+          q = query(
+            productsRef,
+            where('status', '==', 'active'),
+            where('createdBy', '!=', currentUser.uid),
+            orderBy('createdBy'),
+            orderBy('createdAt', 'desc')
+          );
+        }
+
         const querySnapshot = await getDocs(q);
-        let fetchedProducts = querySnapshot.docs.map(doc => ({
+        const fetchedProducts = querySnapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...doc.data(),
+          createdAt: doc.data().createdAt?.toDate() || new Date()
         })) as Product[];
 
-        // Filter by category
-        if (selectedCategory !== 'all') {
-          fetchedProducts = fetchedProducts.filter(product => 
-            product.category === selectedCategory
-          );
-        }
-
-        // Filter by distance if location is available and distance is selected
-        if (currentLocation && selectedDistance !== 'everywhere') {
-          const maxDistance = parseInt(selectedDistance);
-          fetchedProducts = fetchedProducts.filter(product => {
-            const dropLocation = product.dropLocations[0];
-            if (!dropLocation) return false;
-            
-            const distance = calculateDistance(
-              currentLocation.latitude,
-              currentLocation.longitude,
-              dropLocation.latitude,
-              dropLocation.longitude
-            );
-            return distance <= maxDistance;
-          });
-        }
-
-        // Filter by search query
-        if (searchQuery) {
-          fetchedProducts = fetchedProducts.filter(product =>
-            product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            product.description.toLowerCase().includes(searchQuery.toLowerCase())
-          );
-        }
-
-        setProducts(fetchedProducts);
+        setAllProducts(fetchedProducts);
+        setFilteredProducts(fetchedProducts);
+        setLoading(false);
       } catch (error) {
         console.error('Error fetching products:', error);
-      } finally {
         setLoading(false);
       }
     }
 
     fetchProducts();
-  }, [currentUser, selectedCategory, selectedDistance, searchQuery, currentLocation]);
+  }, [currentUser]);
+
+  // Filter products based on category, distance, and search
+  useEffect(() => {
+    if (!allProducts.length) return;
+
+    let filtered = [...allProducts];
+
+    // Filter by category
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(product => product.category === selectedCategory);
+    }
+
+    // Filter by search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(product =>
+        product.title.toLowerCase().includes(query) ||
+        product.description.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply distance filtering if location is available and not set to everywhere
+    if (currentLocation && selectedDistance !== 'everywhere') {
+      const maxDistance = parseInt(selectedDistance);
+      filtered = filtered.filter(product => {
+        const dropLocation = product.dropLocations[0];
+        if (!dropLocation) return false;
+        
+        const distance = calculateDistance(
+          currentLocation.latitude,
+          currentLocation.longitude,
+          dropLocation.latitude,
+          dropLocation.longitude
+        );
+        return distance <= maxDistance;
+      });
+    }
+
+    setFilteredProducts(filtered);
+  }, [allProducts, selectedCategory, selectedDistance, searchQuery, currentLocation]);
 
   const handleLocationSelect = (location: Location) => {
     setCurrentLocation(location);
@@ -212,13 +233,13 @@ function HomeScreen() {
           <div className="flex justify-center items-center h-40">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
-        ) : products.length === 0 ? (
+        ) : filteredProducts.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
-            No products found
+            No products found nearby
           </div>
         ) : (
           <div className="product-grid">
-            {products.map((product) => (
+            {filteredProducts.map((product) => (
               <div
                 key={product.id}
                 onClick={() => navigate(`/product/${product.id}`)}
